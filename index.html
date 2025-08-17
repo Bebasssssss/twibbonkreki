@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Twibbon Maker KREKI</title>
+<title>Twibbon Maker dengan Adjust Foto dan HD Download</title>
 <style>
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -47,7 +47,7 @@
     width: 100%;
     height: auto;
     user-select: none;
-  }
+     }
 
   #frameCanvas {
     position: absolute;
@@ -149,7 +149,7 @@
   const canvasSize = 500; // preview canvas size
   const HDSize = 2000; // output canvas size for HD export
 
-  // Frame HD - pakai frame HD yang sudah kamu upload atau ganti di sini
+  // Frame HD - ganti dengan link frame HD kamu (pastikan resolusi besar)
   const frameUrl = 'https://i.ibb.co.com/9m2xRL3M/TWIBBON.png';
 
   let userImage = new Image();
@@ -225,29 +225,60 @@
   }
 
   // Drag foto
-  photoCanvas.addEventListener('mousedown', (e) => {
-    if (!userImage.src) return;
-    isDragging = true;
-    dragStartX = e.offsetX;
-    dragStartY = e.offsetY;
-    imgOffsetX = imgX;
-    imgOffsetY = imgY;
-  });
-  photoCanvas.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-      const dx = e.offsetX - dragStartX;
-      const dy = e.offsetY - dragStartY;
-      imgX = imgOffsetX + dx;
-      imgY = imgOffsetY + dy;
-      draw();
-    }
-  });
-  photoCanvas.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
-  photoCanvas.addEventListener('mouseleave', () => {
-    isDragging = false;
-  });
+// Fungsi bantu untuk get posisi sentuh atau mouse relatif ke canvas
+function getEventPosition(e, element) {
+  let x, y;
+  if (e.touches && e.touches.length > 0) {
+    const rect = element.getBoundingClientRect();
+    x = e.touches[0].clientX - rect.left;
+    y = e.touches[0].clientY - rect.top;
+  } else {
+    x = e.offsetX;
+    y = e.offsetY;
+  }
+  return { x, y };
+}
+
+// Drag foto dengan mouse dan touch
+function startDrag(e) {
+  if (!userImage.src) return;
+  isDragging = true;
+  const pos = getEventPosition(e, photoCanvas);
+  dragStartX = pos.x;
+  dragStartY = pos.y;
+  imgOffsetX = imgX;
+  imgOffsetY = imgY;
+  e.preventDefault();
+}
+
+function duringDrag(e) {
+  if (!isDragging) return;
+  const pos = getEventPosition(e, photoCanvas);
+  const dx = pos.x - dragStartX;
+  const dy = pos.y - dragStartY;
+  imgX = imgOffsetX + dx;
+  imgY = imgOffsetY + dy;
+  draw();
+  e.preventDefault();
+}
+
+function endDrag(e) {
+  isDragging = false;
+  e.preventDefault();
+}
+
+// Event mouse
+photoCanvas.addEventListener('mousedown', startDrag);
+photoCanvas.addEventListener('mousemove', duringDrag);
+photoCanvas.addEventListener('mouseup', endDrag);
+photoCanvas.addEventListener('mouseleave', endDrag);
+
+// Event touch
+photoCanvas.addEventListener('touchstart', startDrag);
+photoCanvas.addEventListener('touchmove', duringDrag);
+photoCanvas.addEventListener('touchend', endDrag);
+photoCanvas.addEventListener('touchcancel', endDrag);
+
 
   // Zoom foto via slider
   zoomInput.addEventListener('input', (e) => {
