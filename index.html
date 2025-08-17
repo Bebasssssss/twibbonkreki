@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Twibbon Maker KREKI</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #a8dadc, #457b9d); /* gradasi biru muda ke biru tua */
+    color: #f1faee;
+    margin: 0;
+    padding: 40px 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  h1 {
+    font-weight: 700;
+    font-size: 2.8rem;
+    margin-bottom: 8px;
+    text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+  }
+
+  p {
+    font-size: 1.1rem;
+    margin-bottom: 25px;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+  }
+
+  #container {
+    position: relative;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    background: #1d3557;
+    max-width: 520px;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  canvas {
+    border-radius: 16px;
+    display: block;
+    width: 100%;
+    height: auto;
+    user-select: none;
+    background: #f0f4f8;
+  }
+
+  #frameCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    border-radius: 16px;
+  }
+
+  input[type="file"] {
+    background: #a8dadc;
+    color: #1d3557;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  }
+
+  input[type="file"]:hover {
+    background: #457b9d;
+    color: #f1faee;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  label {
+    max-width: 520px;
+    color: #f1faee;
+    font-weight: 600;
+    text-align: left;
+    margin: 15px auto 0 auto;
+    display: block;
+    user-select: none;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  }
+
+  button {
+    background: linear-gradient(45deg, #1d3557, #457b9d);
+    border: none;
+    padding: 14px 36px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: #f1faee;
+    cursor: pointer;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    transition: background 0.4s ease;
+    user-select: none;
+    max-width: 520px;
+    width: 100%;
+    margin: 20px auto 0 auto;
+  }
+
+  button:disabled {
+    background: #a8dadc88;
+    cursor: not-allowed;
+    box-shadow: none;
+    color: #ddd;
+  }
+
+  button:not(:disabled):hover {
+    background: linear-gradient(45deg, #5a81b8, #9ec5e4);
+    color: #1d3557;
+  }
+</style>
+</head>
+<body>
+
+<h1>Twibbon Maker KREKI</h1>
+<p>Upload foto, geser dan zoom agar pas dengan frame</p>
+
+<input type="file" id="upload" accept="image/*" />
+<label>Zoom Foto: <input type="range" id="zoom" min="0.5" max="3" step="0.01" value="1" disabled></label>
+
+<div id="container">
+  <canvas id="photoCanvas" width="500" height="500"></canvas>
+  <canvas id="frameCanvas" width="500" height="500"></canvas>
+</div>
+
+<button id="downloadBtn" disabled>Download Foto Twibbon HD</button>
+
+<script>
+  const uploadInput = document.getElementById('upload');
+  const zoomInput = document.getElementById('zoom');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  const photoCanvas = document.getElementById('photoCanvas');
+  const photoCtx = photoCanvas.getContext('2d');
+
+  const frameCanvas = document.getElementById('frameCanvas');
+  const frameCtx = frameCanvas.getContext('2d');
+
+  const canvasSize = 500; // preview canvas size
+  const HDSize = 2000; // output canvas size for HD export
+
+  // Frame HD - ganti dengan link frame HD kamu (pastikan resolusi besar)
+  const frameUrl = 'https://i.ibb.co.com/9m2xRL3M/TWIBBON.png';
+
+  let userImage = new Image();
+  let frameImage = new Image();
+  let frameLoaded = false;
+
+  // Posisi dan zoom foto
+  let imgX = 0, imgY = 0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let imgOffsetX = 0;
+  let imgOffsetY = 0;
+  let imgScale = 1;
+
+  photoCanvas.width = canvasSize;
+  photoCanvas.height = canvasSize;
+  frameCanvas.width = canvasSize;
+  frameCanvas.height = canvasSize;
+
+  // Load frame
+  frameImage.crossOrigin = 'anonymous';
+  frameImage.src = frameUrl;
+  frameImage.onload = () => {
+    frameLoaded = true;
+    draw();
+  };
+  frameImage.onerror = () => {
+    alert('Gagal load frame. Pastikan link benar dan bisa diakses.');
+  };
+
+  // Upload foto user
+  uploadInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      userImage = new Image();
+      userImage.crossOrigin = 'anonymous';
+      userImage.onload = () => {
+        // Reset posisi dan zoom
+        imgScale = 1;
+        zoomInput.value = 1;
+        imgX = (canvasSize - userImage.width) / 2;
+        imgY = (canvasSize - userImage.height) / 2;
+        imgOffsetX = imgX;
+        imgOffsetY = imgY;
+        zoomInput.disabled = false;
+        downloadBtn.disabled = false;
+        draw();
+      };
+      userImage.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Draw foto & frame preview
+  function draw() {
+    photoCtx.clearRect(0, 0, canvasSize, canvasSize);
+    if (userImage.src) {
+      const w = userImage.width * imgScale;
+      const h = userImage.height * imgScale;
+      photoCtx.drawImage(userImage, imgX, imgY, w, h);
+    } else {
+      photoCtx.clearRect(0, 0, canvasSize, canvasSize);
+    }
+
+    frameCtx.clearRect(0, 0, canvasSize, canvasSize);
+    if (frameLoaded) {
+      frameCtx.drawImage(frameImage, 0, 0, canvasSize, canvasSize);
+    }
+  }
+
+  // Drag foto
+  photoCanvas.addEventListener('mousedown', (e) => {
+    if (!userImage.src) return;
+    isDragging = true;
+    dragStartX = e.offsetX;
+    dragStartY = e.offsetY;
+    imgOffsetX = imgX;
+    imgOffsetY = imgY;
+  });
+  photoCanvas.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      const dx = e.offsetX - dragStartX;
+      const dy = e.offsetY - dragStartY;
+      imgX = imgOffsetX + dx;
+      imgY = imgOffsetY + dy;
+      draw();
+    }
+  });
+  photoCanvas.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+  photoCanvas.addEventListener('mouseleave', () => {
+    isDragging = false;
+  });
+
+  // Zoom foto via slider
+  zoomInput.addEventListener('input', (e) => {
+    if (!userImage.src) return;
+    const prevScale = imgScale;
+    imgScale = parseFloat(e.target.value);
+
+    // Sesuaikan posisi supaya zoom ke tengah canvas
+    const centerX = canvasSize / 2;
+    const centerY = canvasSize / 2;
+
+    imgX = centerX - ((centerX - imgX) * (imgScale / prevScale));
+    imgY = centerY - ((centerY - imgY) * (imgScale / prevScale));
+
+    draw();
+  });
+
+  // Download hasil gabungan HD
+  downloadBtn.addEventListener('click', () => {
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = HDSize;
+    finalCanvas.height = HDSize;
+    const finalCtx = finalCanvas.getContext('2d');
+
+    const scaleFactor = HDSize / canvasSize;
+
+    const w = userImage.width * imgScale * scaleFactor;
+    const h = userImage.height * imgScale * scaleFactor;
+    const x = imgX * scaleFactor;
+    const y = imgY * scaleFactor;
+
+    finalCtx.drawImage(userImage, x, y, w, h);
+
+    if (frameLoaded) {
+      finalCtx.drawImage(frameImage, 0, 0, HDSize, HDSize);
+    }
+
+    finalCanvas.toBlob((blob) => {
+      if (!blob) return;
+      const link = document.createElement('a');
+      link.download = 'foto-twibbon-HD.png';
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }, 'image/png');
+  });
+</script>
+
+</body>
+</html>
